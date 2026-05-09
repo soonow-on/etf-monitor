@@ -3,12 +3,10 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
-# ページの設定は一番最初に書く必要があります
 st.set_page_config(page_title="ETF監視アプリ", layout="wide")
 
 # ---- パスワード認証機能 ----
 def check_password():
-    # まだパスワードが入力されていない、または間違っている場合
     if "password_correct" not in st.session_state:
         st.session_state["password_correct"] = False
 
@@ -16,21 +14,18 @@ def check_password():
         st.title("🔒 ログイン")
         password = st.text_input("パスワードを入力してください", type="password")
         if password:
-            # Streamlitの裏側の設定（Secrets）と照合する
             if password == st.secrets["password"]:
                 st.session_state["password_correct"] = True
-                st.rerun() # 画面を再読み込みしてメイン画面へ
+                st.rerun() 
             else:
                 st.error("パスワードが違います")
         return False
     return True
 
 # ---- メインのETF監視アプリ ----
-# パスワードが合っている場合のみ、以下のコードが実行されます
 if check_password():
     st.title("📈 国内不動産ETF 監視ダッシュボード")
 
-    # 監視対象の10銘柄
     tickers = {
         "2566.T": "One ETF ログ(物流)", "2515.T": "外国REIT", "2845.T": "豪州REIT",
         "1345.T": "隔月分配REIT", "2555.T": "SMTAM(年4回)",
@@ -39,7 +34,10 @@ if check_password():
     }
 
     def get_data(ticker):
-        df = yf.download(ticker, period="1y")
+        # 仕様変更によるエラーを回避するため、取得方法をhistoryに変更
+        ticker_data = yf.Ticker(ticker)
+        df = ticker_data.history(period="1y")
+        
         if df.empty: return None
         
         # ゴールデンクロス用 (5日と25日移動平均)
@@ -63,8 +61,16 @@ if check_password():
             latest = df.iloc[-1]
             prev = df.iloc[-2]
             
-            rsi_alert = "⚠️ 買い時 (RSI30以下)" if latest['RSI'] < 30 else "待機"
-            gc_alert = "🔥 GC発生!" if (prev['SMA5'] <= prev['SMA25']) and (latest['SMA5'] > latest['SMA25']) else "待機"
+            # エラー防止のため、数値を明示的にfloat(小数)に変換して比較
+            rsi_val = float(latest['RSI'])
+            rsi_alert = "⚠️ 買い時 (RSI30以下)" if rsi_val < 30 else "待機"
+            
+            sma5_prev = float(prev['SMA5'])
+            sma25_prev = float(prev['SMA25'])
+            sma5_latest = float(latest['SMA5'])
+            sma25_latest = float(latest['SMA25'])
+            
+            gc_alert = "🔥 GC発生!" if (sma5_prev <= sma25_prev) and (sma5_latest > sma25_latest) else "待機"
             
             current_month = datetime.now().month
             drop_alert = "待機"
@@ -74,7 +80,7 @@ if check_password():
                 drop_alert = "📅 権利落ち警戒月"
                 
             with st.expander(f"{ticker[:4]} - {name}"):
-                st.write(f"**現在値:** {latest['Close']:.1f} 円")
-                st.write(f"**RSI指標:** {rsi_alert} (現在: {latest['RSI']:.1f}%)")
+                st.write(f"**現在値:** {float(latest['Close']):.1f} 円")
+                st.write(f"**RSI指標:** {rsi_alert} (現在: {rsi_val:.1f}%)")
                 st.write(f"**トレンド:** {gc_alert}")
                 st.write(f"**権利落ち:** {drop_alert}")
