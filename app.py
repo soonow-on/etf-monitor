@@ -14,7 +14,7 @@ def check_password():
 
     if not st.session_state["password_correct"]:
         st.title("🔒 ログイン")
-        password = st.text_input("パスワードを入力してください", type="password")
+        password = st.text_input("パスワードを入力してください", type="sscoolj")
         if password:
             # Streamlitの裏側の設定（Secrets）と照合する
             if password == st.secrets["password"]:
